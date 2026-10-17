@@ -1,0 +1,87 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+html,
+body,
+[class*="css"] {
+  font-family: "Inter", sans-serif;
+}
+.stApp {
+  background: #0b1020;
+  color: #e8edf7;
+}
+[data-testid="stSidebar"] {
+  background: #10182b;
+  border-right: 1px solid #27334c;
+}
+[data-testid="stSidebar"] * {
+  color: #e8edf7;
+}
+.hero,
+.page-head {
+  padding: 2.1rem;
+  border: 1px solid #273653;
+  border-radius: 22px;
+  background: radial-gradient(
+    circle at top right,
+    #173b52 0,
+    #111a30 38%,
+    #101629 100%
+  );
+  margin-bottom: 1.4rem;
+}
+.hero h1,
+.page-head h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin: 0.3rem 0;
+  color: #f5f8ff;
+}
+.hero p,
+.page-head p {
+  color: #aebbd1;
+  font-size: 1.05rem;
+}
+.eyebrow {
+  color: #5eead4;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+.gantt-block {
+  min-height: 78px;
+  padding: 13px 5px;
+  border: 1px solid #4b7890;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #155e75, #164e63);
+  text-align: center;
+  color: white;
+  margin-bottom: 8px;
+}
+.gantt-block b {
+  display: block;
+  font-size: 1.1rem;
+}
+.gantt-block small {
+  display: block;
+  margin-top: 7px;
+  color: #c9f3ff;
+}
+div[data-testid="stMetric"] {
+  background: #121d32;
+  padding: 1rem;
+  border: 1px solid #283650;
+  border-radius: 14px;
+}
+.stButton button[kind="primary"],
+button[kind="primaryFormSubmit"] {
+  background: #0d9488;
+  border: 0;
+  color: white;
+  border-radius: 10px;
+  font-weight: 700;
+}
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
