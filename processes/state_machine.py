@@ -1,4 +1,5 @@
-"""State transitions for the educational process lifecycle simulator."""
+
+"""Process lifecycle and state transitions."""
 
 STATES = ("New", "Ready", "Running", "Waiting", "Terminated")
 
@@ -16,44 +17,56 @@ TRANSITIONS = {
 }
 
 
-def create_process(pid: str, name: str, burst_time: int) -> dict:
-    """Create a process in the New state."""
-    if not pid or not name:
-        raise ValueError("PID and process name are required.")
-    if int(burst_time) <= 0:
+def create_process(pid, name, burst_time):
+    burst_time = int(burst_time)
+
+    if burst_time <= 0:
         raise ValueError("Burst time must be greater than zero.")
+
     return {
         "pid": str(pid),
         "name": str(name),
         "state": "New",
-        "burst_time": int(burst_time),
-        "remaining_time": int(burst_time),
+        "burst_time": burst_time,
+        "remaining_time": burst_time,
         "last_transition": "Created",
     }
 
 
-def get_available_actions(state: str) -> list[str]:
-    """Return actions allowed from the current state."""
+def get_available_actions(state):
     return list(TRANSITIONS.get(state, {}).keys())
 
 
-def transition_process(process: dict, action: str) -> dict:
-    """Apply one valid state transition and update simple burst-time tracking."""
+def transition_process(process, action):
     state = process["state"]
-    if action not in TRANSITIONS.get(state, {}):
-        raise ValueError(f"Action '{action}' is not valid from state '{state}'.")
+    allowed = TRANSITIONS.get(state, {})
+
+    if action not in allowed:
+        raise ValueError(
+            f"Action {action} is invalid from {state}."
+        )
 
     if action == "execute_unit":
-        process["remaining_time"] = max(0, int(process["remaining_time"]) - 1)
+        process["remaining_time"] = max(
+            0, process["remaining_time"] - 1
+        )
+
         if process["remaining_time"] == 0:
             process["state"] = "Terminated"
-            process["last_transition"] = "Running → Terminated (burst completed)"
+            process["last_transition"] = (
+                "Running → Terminated (burst completed)"
+            )
             return process
+
         process["state"] = "Running"
-        process["last_transition"] = f"Executed 1 CPU unit; {process['remaining_time']} remaining"
+        process["last_transition"] = (
+            f"Executed 1 CPU unit; "
+            f"{process['remaining_time']} remaining"
+        )
         return process
 
-    new_state = TRANSITIONS[state][action]
+    new_state = allowed[action]
     process["state"] = new_state
     process["last_transition"] = f"{state} → {new_state}"
+
     return process

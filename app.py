@@ -113,13 +113,14 @@ if section == "Home":
     c.metric("Next Module", "Synchronization")
     st.info("Choose **Processes** to explore process states, or **CPU Scheduling** to run an algorithm.")
 
+
 elif section == "Processes":
     st.markdown(
         """
         <div class="page-head">
-          <div class="eyebrow">PROCESS MANAGEMENT</div>
+          <div class="eyebrow">PROCESS MANAGEMENT 2.0</div>
           <h1>Processes &amp; States</h1>
-          <p>Create a process and explore how it moves through the operating system lifecycle.</p>
+          <p>Manage multiple processes with manual stepping and automatic execution.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -129,6 +130,10 @@ elif section == "Processes":
         st.session_state.os_processes = []
     if "next_pid" not in st.session_state:
         st.session_state.next_pid = 1
+    if "process_auto_run" not in st.session_state:
+        st.session_state.process_auto_run = False
+    if "process_clock" not in st.session_state:
+        st.session_state.process_clock = 0
 
     processes = st.session_state.os_processes
 
@@ -145,103 +150,289 @@ elif section == "Processes":
           <div class="state-node state-terminated"><b>TERMINATED</b><small>Finished</small></div>
         </div>
         <div class="state-flow state-flow-secondary">
-          <span class="state-note">Running → Waiting: requests I/O</span>
-          <span class="state-note">Waiting → Ready: I/O completes</span>
-          <span class="state-note">Running → Ready: preemption</span>
+          <span class="state-note">Running → Waiting: I/O request</span>
+          <span class="state-note">Waiting → Ready: I/O completed</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.caption("This is a simplified five-state process model. Transitions are controlled manually for learning.")
+
+    def advance_process():
+        """Advance the educational FCFS-style process lifecycle by one tick."""
+        items = st.session_state.os_processes
+
+        if not items:
+            return
+
+        # Admit the first New process into the Ready state.
+        new_process = next(
+            (p for p in items if p["state"] == "New"), None
+        )
+        if new_process:
+            transition_process(new_process, "admit")
+            st.session_state.process_clock += 1
+            return
+
+        # Continue executing the process currently using the CPU.
+        running = next(
+            (p for p in items if p["state"] == "Running"), None
+        )
+        if running:
+            transition_process(running, "execute_unit")
+            st.session_state.process_clock += 1
+            return
+
+        # If the CPU is free, dispatch the first Ready process.
+        ready = next(
+            (p for p in items if p["state"] == "Ready"), None
+        )
+        if ready:
+            transition_process(ready, "dispatch")
+            st.session_state.process_clock += 1
+            return
+
+        # No Ready, Running or New processes remain.
+        st.session_state.process_auto_run = False
 
     with st.form("create_process_form", clear_on_submit=True):
         st.markdown("### Create a process")
-        pcol1, pcol2 = st.columns(2)
-        process_name = pcol1.text_input("Process name", placeholder="e.g. Browser")
-        process_burst = pcol2.number_input("CPU burst time (units)", min_value=1, max_value=999, value=5)
-        create_clicked = st.form_submit_button("＋ Create Process", type="primary", use_container_width=True)
+        col1, col2 = st.columns(2)
+
+        process_name = col1.text_input(
+            "Process name", placeholder="e.g. Browser"
+        )
+        process_burst = col2.number_input(
+            "CPU burst time",
+            min_value=1,
+            max_value=999,
+            value=5,
+            step=1,
+        )
+
+        create_clicked = st.form_submit_button(
+            "＋ Create Process",
+            type="primary",
+            use_container_width=True,
+        )
 
     if create_clicked:
         pid = f"P{st.session_state.next_pid}"
-        new_process = create_process(pid, process_name.strip() or pid, int(process_burst))
-        st.session_state.os_processes.append(new_process)
+
+        st.session_state.os_processes.append(
+            create_process(
+                pid,
+                process_name.strip() or pid,
+                int(process_burst),
+            )
+        )
+
         st.session_state.next_pid += 1
-        st.success(f"{pid} created in the New state.")
+        st.session_state.process_auto_run = False
+        st.success(f"{pid} created successfully in New state.")
         st.rerun()
 
-    if processes:
-        st.markdown("### Transition controls")
+    # This fragment refreshes itself during Auto Run.
+    @st.fragment(run_every=1.0)
+    def process_dashboard():
+        items = st.session_state.os_processes
+
+        st.markdown("### Simulation controls")
+
+        a, b, c = st.columns(3)
+
+        with a:
+            if st.button(
+                "⏭️ Next Step",
+                use_container_width=True,
+                disabled=not items,
+            ):
+                st.session_state.process_auto_run = False
+                advance_process()
+                st.rerun(scope="app")
+
+        with b:
+            if st.button(
+                "▶️ Auto Run",
+                type="primary",
+                use_container_width=True,
+                disabled=(
+                    not items
+                    or st.session_state.process_auto_run
+                    or all(
+                        p["state"] in ("Terminated", "Waiting")
+                        for p in items
+                    )
+                ),
+            ):
+                st.session_state.process_auto_run = True
+                st.rerun(scope="app")
+
+        with c:
+            if st.button(
+                "⏸️ Pause",
+                use_container_width=True,
+                disabled=not st.session_state.process_auto_run,
+            ):
+                st.session_state.process_auto_run = False
+                st.rerun(scope="app")
+
+        running_now = next(
+            (p for p in items if p["state"] == "Running"), None
+        )
+
+        # Automatic simulation: one tick per fragment refresh.
+        if st.session_state.process_auto_run:
+            advance_process()
+
+            items = st.session_state.os_processes
+
+            unfinished = any(
+                p["state"] in ("New", "Ready", "Running")
+                for p in items
+            )
+
+            if not unfinished:
+                st.session_state.process_auto_run = False
+
+        st.markdown(
+            f"**Simulation clock:** {st.session_state.process_clock} units"
+        )
+
+        if st.session_state.process_auto_run:
+            st.info("Auto Run is active. Use Pause to stop the simulation.")
+        elif items:
+            st.caption("Paused. Use Next Step or Auto Run to continue.")
+
+        if not items:
+            st.info("Create your first process above to start.")
+            return
+
+        # Current process and process table.
+        running = next(
+            (p for p in items if p["state"] == "Running"), None
+        )
+
+        if running:
+            st.success(
+                f"CPU is executing: {running['pid']} · {running['name']}"
+            )
+        else:
+            st.info("CPU is idle. A Ready process can be dispatched.")
+
+        rows = [
+            {
+                "PID": p["pid"],
+                "Name": p["name"],
+                "State": p["state"],
+                "CPU Burst": p["burst_time"],
+                "Remaining": p["remaining_time"],
+                "Last Transition": p["last_transition"],
+            }
+            for p in items
+        ]
+
+        st.markdown("### Live process table")
+        st.dataframe(
+            pd.DataFrame(rows),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### Individual process controls")
         selected_pid = st.selectbox(
             "Select process",
-            options=[p["pid"] for p in processes],
+            options=[p["pid"] for p in items],
             format_func=lambda pid: next(
                 f'{p["pid"]} · {p["name"]} ({p["state"]})'
-                for p in processes if p["pid"] == pid
+                for p in items if p["pid"] == pid
             ),
+            key="process_selected_pid",
         )
-        selected = next(p for p in processes if p["pid"] == selected_pid)
+
+        selected = next(
+            p for p in items if p["pid"] == selected_pid
+        )
+
         st.markdown(
-            f'<div class="current-state"><span>Selected process</span><strong>{selected["pid"]} · {selected["name"]}</strong>'
-            f'<span class="state-pill">{selected["state"]}</span></div>',
+            f"""
+            <div class="current-state">
+              <span>Selected process</span>
+              <strong>{selected["pid"]} · {selected["name"]}</strong>
+              <span class="state-pill">{selected["state"]}</span>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
 
         actions = get_available_actions(selected["state"])
+
+        labels = {
+            "admit": "Admit to Ready",
+            "dispatch": "Dispatch to Running",
+            "execute_unit": "Execute 1 CPU Unit",
+            "request_io": "Request I/O",
+            "complete_io": "Complete I/O",
+            "preempt": "Preempt to Ready",
+            "terminate": "Terminate Process",
+        }
+
         if actions:
-            labels = {
-                "admit": "Admit to Ready",
-                "dispatch": "Dispatch to Running",
-                "execute_unit": "Execute 1 CPU Unit",
-                "request_io": "Request I/O (Waiting)",
-                "complete_io": "Complete I/O (Ready)",
-                "preempt": "Preempt to Ready",
-                "terminate": "Terminate Process",
-            }
             action_cols = st.columns(min(3, len(actions)))
+
             for i, action in enumerate(actions):
                 with action_cols[i % len(action_cols)]:
-                    if st.button(labels[action], key=f"{selected_pid}_{action}", use_container_width=True):
+                    if st.button(
+                        labels[action],
+                        key=f"manual_{selected_pid}_{action}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.process_auto_run = False
                         transition_process(selected, action)
-                        st.rerun()
+                        st.rerun(scope="app")
         else:
-            st.info("This process has terminated. Create another process to continue.")
+            st.info("This process has terminated.")
 
         left, right = st.columns([1.5, 1])
+
         with left:
-            st.markdown("### Process table")
-            table_rows = [
-                {
-                    "PID": p["pid"],
-                    "Name": p["name"],
-                    "State": p["state"],
-                    "CPU Burst": p["burst_time"],
-                    "Remaining": p["remaining_time"],
-                }
-                for p in processes
-            ]
-            st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+            st.markdown("### Process state summary")
+
+            for state in (
+                "New", "Ready", "Running", "Waiting", "Terminated"
+            ):
+                count = sum(
+                    p["state"] == state for p in items
+                )
+                st.write(f"**{state}:** {count}")
+
         with right:
-            st.markdown("### Process Control Block (PCB)")
+            st.markdown("### Process Control Block")
+
             st.markdown(
                 f"""
                 <div class="pcb-card">
-                  <div class="pcb-row"><span>Process ID</span><b>{selected["pid"]}</b></div>
-                  <div class="pcb-row"><span>Process name</span><b>{selected["name"]}</b></div>
-                  <div class="pcb-row"><span>Current state</span><b>{selected["state"]}</b></div>
-                  <div class="pcb-row"><span>CPU burst</span><b>{selected["burst_time"]}</b></div>
-                  <div class="pcb-row"><span>Remaining time</span><b>{selected["remaining_time"]}</b></div>
-                  <div class="pcb-row"><span>Last transition</span><b>{selected["last_transition"]}</b></div>
+                  <div class="pcb-row"><span>PID</span><b>{selected["pid"]}</b></div>
+                  <div class="pcb-row"><span>Name</span><b>{selected["name"]}</b></div>
+                  <div class="pcb-row"><span>State</span><b>{selected["state"]}</b></div>
+                  <div class="pcb-row"><span>CPU Burst</span><b>{selected["burst_time"]}</b></div>
+                  <div class="pcb-row"><span>Remaining</span><b>{selected["remaining_time"]}</b></div>
+                  <div class="pcb-row"><span>Last Transition</span><b>{selected["last_transition"]}</b></div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
-        if st.button("Reset all processes", type="secondary"):
+        st.divider()
+
+        if st.button("🗑️ Reset All Processes", type="secondary"):
+            st.session_state.process_auto_run = False
             st.session_state.os_processes = []
             st.session_state.next_pid = 1
-            st.rerun()
-    else:
-        st.info("No processes yet. Create your first process above to start the simulation.")
+            st.session_state.process_clock = 0
+            st.rerun(scope="app")
+
+    process_dashboard()
+
 
 elif section == "Process Synchronization":
     st.markdown(
